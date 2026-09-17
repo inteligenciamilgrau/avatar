@@ -1,0 +1,19 @@
+# ==============================================================
+#  Extras para rodar o Faster Whisper na GPU NVIDIA
+#
+#      .venv\Scripts\pip install -r requirements-gpu.txt
+#
+#  Sao ~1 GB de download. Instala o CPU normal mais as bibliotecas
+#  CUDA. Nao precisa do CUDA Toolkit nem de mexer no PATH: o
+#  tools/whisper_worker.py acha estas DLLs dentro do venv sozinho.
+#
+#  Requisitos: GPU NVIDIA com driver 525+ (Windows 527+).
+#  Se algo faltar, o worker cai para CPU automaticamente - nao quebra.
+# ==============================================================
+
+-r requirements.txt
+
+# ctranslate2 4.8 usa cuBLAS 12 e cuDNN 9. Versoes fora dessas faixas
+# carregam mas quebram na primeira transcricao.
+nvidia-cublas-cu12>=12.3,<13
+nvidia-cudnn-cu12>=9.0,<10

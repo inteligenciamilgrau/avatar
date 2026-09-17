@@ -1,0 +1,20 @@
+# ==============================================================
+#  Avatar Voxel - Faster Whisper (voz -> texto, offline)
+#
+#  CPU (funciona em qualquer maquina):
+#      python -m venv .venv
+#      .venv\Scripts\pip install -r requirements.txt
+#
+#  GPU NVIDIA (bem mais rapido, ver requirements-gpu.txt):
+#      .venv\Scripts\pip install -r requirements-gpu.txt
+#
+#  NAO precisa instalar ffmpeg. O faster-whisper le o audio com
+#  PyAV (instalado junto, como dependencia), e o PyAV ja embute as
+#  bibliotecas do FFmpeg no proprio pacote.
+# ==============================================================
+
+faster-whisper==1.2.1
+
+# Vem junto com o faster-whisper; fixado aqui porque e ele quem
+# decide a versao de CUDA exigida (a 4.8 pede cuBLAS 12 + cuDNN 9).
+ctranslate2==4.8.2

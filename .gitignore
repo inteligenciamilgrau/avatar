@@ -1,0 +1,57 @@
+# ---------------------------------------------------------------
+# Segredos e configuracao da maquina  --  NUNCA versionar
+# ---------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# Estado local do app: a chave salva do Ollama e o system prompt personalizado.
+# O servidor recria a pasta sozinho, com os valores padrao.
+data/
+
+# ---------------------------------------------------------------
+# Dependencias
+# ---------------------------------------------------------------
+node_modules/
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# ---------------------------------------------------------------
+# Artefatos gerados (o start.bat recria)
+# ---------------------------------------------------------------
+tmp/
+tools/TtsTool.exe
+*.wav
+*.log
+
+# ---------------------------------------------------------------
+# Workspace do Blender: pesado e nao e preciso para rodar o app.
+# O avatar ja vai pronto em assets/voxel_avatar.glb.
+# Os renders carregam o caminho absoluto da maquina nos metadados PNG.
+# ---------------------------------------------------------------
+blender/
+*.blend
+*.blend1
+
+# ---------------------------------------------------------------
+# Imagens grandes que o app nao usa
+# ---------------------------------------------------------------
+avatar.png
+assets/avatar.png
+favicon-512.png
+
+# ---------------------------------------------------------------
+# Sistema operacional / editores
+# ---------------------------------------------------------------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.vscode/
+.idea/
+*.swp
