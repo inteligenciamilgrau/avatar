@@ -33,6 +33,7 @@
         <div class="view-tabs" role="tablist">
           <button type="button" id="tab2d" class="view-tab is-on" data-view="2d" role="tab" aria-selected="true">2D · Imagem</button>
           <button type="button" id="tab3d" class="view-tab" data-view="3d" role="tab" aria-selected="false">3D · Blender</button>
+          <select id="avatarPick" class="avatar-pick" title="Trocar de avatar" aria-label="Avatar" hidden></select>
         </div>
         <div class="stage-frame" id="stage2d">
           <canvas id="avatar" width="1024" height="1024"></canvas>
@@ -103,185 +104,223 @@
           <h2>Configurações</h2>
           <button id="btnCloseConfig" class="icon-btn" type="button" aria-label="Fechar">✕</button>
         </header>
+        <nav class="cfg-tabs" id="cfgTabs" role="tablist">
+          <button type="button" class="cfg-tab is-on" data-panel="voz" role="tab" aria-selected="true">Voz</button>
+          <button type="button" class="cfg-tab" data-panel="microfone" role="tab" aria-selected="false">Microfone</button>
+          <button type="button" class="cfg-tab" data-panel="ollama" role="tab" aria-selected="false">Ollama</button>
+          <button type="button" class="cfg-tab" data-panel="avatar" role="tab" aria-selected="false">Avatar</button>
+          <button type="button" class="cfg-tab" data-panel="persona" role="tab" aria-selected="false">Persona</button>
+        </nav>
         <div class="modal-body">
-          <p class="hint" id="liveKeyHint"></p>
-          <label class="lbl" for="liveVoice">Voz GPT-Live</label>
-          <select id="liveVoice">
-            <option value="bossa">Bossa · pt-BR feminina</option>
-            <option value="tempo">Tempo · pt-BR masculina</option>
-            <option value="marin">Marin</option>
-            <option value="gleam">Gleam</option>
-            <option value="willow">Willow</option>
-            <option value="quartz">Quartz</option>
-            <option value="vesper">Vesper</option>
-            <option value="ripple">Ripple</option>
-          </select>
-          <div class="sliders">
-            <label>
-              Mínimo da boca (OpenAI)
-              <span id="liveMouthMinVal">0%</span>
-              <input id="liveMouthMin" type="range" min="0" max="90" step="1" value="0" />
-            </label>
-            <label>
-              Máximo da boca (OpenAI)
-              <span id="liveMouthMaxVal">100%</span>
-              <input id="liveMouthMax" type="range" min="10" max="100" step="1" value="100" />
-            </label>
-          </div>
-          <p class="hint" id="liveMouthGainHint">Mínimo = piso. Máximo = teto. Cada voz OpenAI tem o seu par.</p>
-          <p class="hint">GPT-Live usa microfone e a voz da OpenAI. A chave fica só no .env do servidor.</p>
 
-          <p class="hint" id="geminiKeyHint"></p>
-          <label class="lbl" for="geminiVoice">Voz Gemini 3.8 Live</label>
-          <select id="geminiVoice">
-            <option value="Kore">Kore · firme</option>
-            <option value="Puck">Puck · animada</option>
-            <option value="Aoede">Aoede · leve</option>
-            <option value="Leda">Leda · jovem</option>
-            <option value="Charon">Charon · informativa</option>
-            <option value="Fenrir">Fenrir · excitável</option>
-            <option value="Orus">Orus · firme</option>
-            <option value="Zephyr">Zephyr · brilhante</option>
-            <option value="Sulafat">Sulafat · calorosa</option>
-            <option value="Achernar">Achernar · suave</option>
-            <option value="Achird">Achird · amigável</option>
-            <option value="Callirrhoe">Callirrhoe · descontraída</option>
-            <option value="Enceladus">Enceladus · soprosa</option>
-            <option value="Gacrux">Gacrux · madura</option>
-          </select>
-          <div class="sliders">
-            <label>
-              Mínimo da boca (Gemini)
-              <span id="geminiMouthMinVal">0%</span>
-              <input id="geminiMouthMin" type="range" min="0" max="90" step="1" value="0" />
-            </label>
-            <label>
-              Máximo da boca (Gemini)
-              <span id="geminiMouthMaxVal">100%</span>
-              <input id="geminiMouthMax" type="range" min="10" max="100" step="1" value="100" />
-            </label>
-          </div>
-          <p class="hint" id="geminiMouthGainHint">Mínimo = piso. Máximo = teto. Cada voz da Google tem o seu par.</p>
-          <p class="hint">Gemini 3.8 Live usa microfone e as vozes nativas da Google. A chave GEMINI_API_KEY fica só no .env do servidor.</p>
+          <!-- ============================ VOZ ============================ -->
+          <section class="cfg-panel" data-panel="voz">
 
-          <label class="chk" for="useOllama">
-            <input id="useOllama" type="checkbox" checked />
-            <span>Usar Ollama quando o motor for Ollama</span>
-          </label>
-          <label class="chk" for="autoStartOllama">
-            <input id="autoStartOllama" type="checkbox" />
-            <span>Abrir o Ollama automaticamente se estiver desligado</span>
-          </label>
-          <p class="hint">Desativado por padrão. O botão Abrir Ollama no chat continua disponível.</p>
-          <p class="lbl">Conexão Ollama</p>
-          <div class="conn-grid">
-            <label>
-              Endpoint
-              <input id="ollamaEndpoint" type="text" value="127.0.0.1" placeholder="127.0.0.1 ou http://host" autocomplete="off" />
+            <!-- Voz local: so aparece quando o motor nao e de nuvem. -->
+            <div class="cfg-group" data-voice="local">
+              <div class="engine">
+                <label class="seg">
+                  <input type="radio" name="engine" id="engineSapi" checked />
+                  <span>Windows SAPI</span>
+                </label>
+                <label class="seg">
+                  <input type="radio" name="engine" id="engineBrowser" />
+                  <span>Navegador</span>
+                </label>
+              </div>
+              <p class="hint" id="engineHint"></p>
+
+              <label class="lbl" for="voice">Voz do Windows</label>
+              <select id="voice"></select>
+
+              <div class="sliders">
+                <label>
+                  Velocidade
+                  <span id="speedVal">1.00×</span>
+                  <input id="speed" type="range" min="0.6" max="1.5" step="0.05" value="1" />
+                </label>
+                <label>
+                  Volume
+                  <span id="volumeVal">100%</span>
+                  <input id="volume" type="range" min="20" max="100" step="1" value="100" />
+                </label>
+                <label>
+                  Mínimo da boca
+                  <span id="mouthMinVal">0%</span>
+                  <input id="mouthMin" type="range" min="0" max="90" step="1" value="0" />
+                </label>
+                <label>
+                  Máximo da boca
+                  <span id="mouthMaxVal">100%</span>
+                  <input id="mouthMax" type="range" min="10" max="100" step="1" value="100" />
+                </label>
+              </div>
+              <p class="hint" id="mouthGainHint">Mínimo = piso. Máximo = teto. Cada voz do Windows tem o seu par.</p>
+            </div>
+
+            <!-- Voz da OpenAI: so no motor GPT-Live. -->
+            <div class="cfg-group" data-voice="gpt-live-1" hidden>
+              <p class="hint" id="liveKeyHint"></p>
+              <label class="lbl" for="liveVoice">Voz GPT-Live</label>
+              <select id="liveVoice">
+                <option value="bossa">Bossa · pt-BR feminina</option>
+                <option value="tempo">Tempo · pt-BR masculina</option>
+                <option value="marin">Marin</option>
+                <option value="gleam">Gleam</option>
+                <option value="willow">Willow</option>
+                <option value="quartz">Quartz</option>
+                <option value="vesper">Vesper</option>
+                <option value="ripple">Ripple</option>
+              </select>
+              <div class="sliders">
+                <label>
+                  Mínimo da boca
+                  <span id="liveMouthMinVal">0%</span>
+                  <input id="liveMouthMin" type="range" min="0" max="90" step="1" value="0" />
+                </label>
+                <label>
+                  Máximo da boca
+                  <span id="liveMouthMaxVal">100%</span>
+                  <input id="liveMouthMax" type="range" min="10" max="100" step="1" value="100" />
+                </label>
+              </div>
+              <p class="hint" id="liveMouthGainHint">Mínimo = piso. Máximo = teto. Cada voz OpenAI tem o seu par.</p>
+              <p class="hint">GPT-Live usa microfone e a voz da OpenAI. A chave fica só no .env do servidor.</p>
+            </div>
+
+            <!-- Voz da Google: so no motor Gemini Live. -->
+            <div class="cfg-group" data-voice="gemini-3.8-live" hidden>
+              <p class="hint" id="geminiKeyHint"></p>
+              <label class="lbl" for="geminiVoice">Voz Gemini 3.8 Live</label>
+              <select id="geminiVoice">
+                <option value="Kore">Kore · firme</option>
+                <option value="Puck">Puck · animada</option>
+                <option value="Aoede">Aoede · leve</option>
+                <option value="Leda">Leda · jovem</option>
+                <option value="Charon">Charon · informativa</option>
+                <option value="Fenrir">Fenrir · excitável</option>
+                <option value="Orus">Orus · firme</option>
+                <option value="Zephyr">Zephyr · brilhante</option>
+                <option value="Sulafat">Sulafat · calorosa</option>
+                <option value="Achernar">Achernar · suave</option>
+                <option value="Achird">Achird · amigável</option>
+                <option value="Callirrhoe">Callirrhoe · descontraída</option>
+                <option value="Enceladus">Enceladus · soprosa</option>
+                <option value="Gacrux">Gacrux · madura</option>
+              </select>
+              <div class="sliders">
+                <label>
+                  Mínimo da boca
+                  <span id="geminiMouthMinVal">0%</span>
+                  <input id="geminiMouthMin" type="range" min="0" max="90" step="1" value="0" />
+                </label>
+                <label>
+                  Máximo da boca
+                  <span id="geminiMouthMaxVal">100%</span>
+                  <input id="geminiMouthMax" type="range" min="10" max="100" step="1" value="100" />
+                </label>
+              </div>
+              <p class="hint" id="geminiMouthGainHint">Mínimo = piso. Máximo = teto. Cada voz da Google tem o seu par.</p>
+              <p class="hint">Gemini 3.8 Live usa microfone e as vozes nativas da Google. A chave GEMINI_API_KEY fica só no .env do servidor.</p>
+            </div>
+          </section>
+
+          <!-- ========================= MICROFONE ========================= -->
+          <section class="cfg-panel" data-panel="microfone" hidden>
+            <p class="lbl">Faster Whisper · voz local</p>
+            <label class="lbl" for="whisperModel">Modelo STT</label>
+            <select id="whisperModel">
+              <option value="tiny">tiny · mais rápido</option>
+              <option value="base">base</option>
+              <option value="small" selected>small · recomendado</option>
+              <option value="medium">medium · melhor</option>
+              <option value="turbo">turbo · large-v3-turbo</option>
+            </select>
+            <label class="lbl" for="whisperLang">Idioma</label>
+            <select id="whisperLang">
+              <option value="pt" selected>Português</option>
+              <option value="en">Inglês</option>
+              <option value="auto">Detectar</option>
+            </select>
+            <p class="hint" id="whisperHint">Microfone → Faster Whisper (offline) → Ollama → voz do Windows. Sem API paga.</p>
+          </section>
+
+          <!-- =========================== OLLAMA ========================== -->
+          <section class="cfg-panel" data-panel="ollama" hidden>
+            <label class="chk" for="useOllama">
+              <input id="useOllama" type="checkbox" checked />
+              <span>Usar Ollama quando o motor for Ollama</span>
             </label>
-            <label>
-              Porta
-              <input id="ollamaPort" type="number" value="11434" min="1" max="65535" />
+            <label class="chk" for="autoStartOllama">
+              <input id="autoStartOllama" type="checkbox" />
+              <span>Abrir o Ollama automaticamente se estiver desligado</span>
             </label>
-          </div>
-          <label class="lbl" for="ollamaKey">Senha / API key</label>
-          <input id="ollamaKey" type="password" value="" placeholder="opcional" autocomplete="off" />
-          <p class="hint">Padrão: 127.0.0.1:11434 sem senha. Aceita host ou URL completa.</p>
-          <div class="row">
-            <button id="btnTestOllama" class="ghost" type="button">Testar conexão</button>
-            <button id="btnSaveOllama" class="primary" type="button">Salvar conexão</button>
-            <button id="btnStopOllamaCfg" class="ghost" type="button">Parar Ollama</button>
-          </div>
-          <label class="lbl" for="ollamaModel">Modelo</label>
-          <select id="ollamaModel"></select>
-          <p class="hint" id="ollamaHint"></p>
+            <p class="hint">Desativado por padrão. O botão Abrir Ollama no chat continua disponível.</p>
 
-          <p class="lbl">Faster Whisper · voz local</p>
-          <label class="lbl" for="whisperModel">Modelo STT</label>
-          <select id="whisperModel">
-            <option value="tiny">tiny · mais rápido</option>
-            <option value="base">base</option>
-            <option value="small" selected>small · recomendado</option>
-            <option value="medium">medium · melhor</option>
-            <option value="turbo">turbo · large-v3-turbo</option>
-          </select>
-          <label class="lbl" for="whisperLang">Idioma</label>
-          <select id="whisperLang">
-            <option value="pt" selected>Português</option>
-            <option value="en">Inglês</option>
-            <option value="auto">Detectar</option>
-          </select>
-          <p class="hint" id="whisperHint">Microfone → Faster Whisper (offline) → Ollama → voz do Windows. Sem API paga.</p>
+            <p class="lbl">Conexão</p>
+            <div class="conn-grid">
+              <label>
+                Endpoint
+                <input id="ollamaEndpoint" type="text" value="127.0.0.1" placeholder="127.0.0.1 ou http://host" autocomplete="off" />
+              </label>
+              <label>
+                Porta
+                <input id="ollamaPort" type="number" value="11434" min="1" max="65535" />
+              </label>
+            </div>
+            <label class="lbl" for="ollamaKey">Senha / API key</label>
+            <input id="ollamaKey" type="password" value="" placeholder="opcional" autocomplete="off" />
+            <p class="hint">Padrão: 127.0.0.1:11434 sem senha. Aceita host ou URL completa.</p>
+            <div class="row">
+              <button id="btnTestOllama" class="ghost" type="button">Testar conexão</button>
+              <button id="btnSaveOllama" class="primary" type="button">Salvar conexão</button>
+              <button id="btnStopOllamaCfg" class="ghost" type="button">Parar Ollama</button>
+            </div>
 
-          <label class="lbl" for="systemPrompt">System prompt</label>
-          <textarea id="systemPrompt" rows="6" placeholder="Instruções do avatar…"></textarea>
-          <div class="row">
-            <button id="btnSaveSystem" class="primary" type="button">Salvar</button>
-            <button id="btnResetSystem" class="ghost" type="button">Padrão</button>
-          </div>
-          <p class="hint" id="systemHint">O texto da caixa já vale na próxima pergunta. Salvar grava no site.</p>
+            <label class="lbl" for="ollamaModel">Modelo</label>
+            <select id="ollamaModel"></select>
+            <p class="hint" id="ollamaHint"></p>
+          </section>
 
-          <label class="lbl" for="voice">Voz do Windows</label>
-          <select id="voice"></select>
-
-          <div class="sliders">
-            <label>
-              Velocidade
-              <span id="speedVal">1.00×</span>
-              <input id="speed" type="range" min="0.6" max="1.5" step="0.05" value="1" />
+          <!-- =========================== AVATAR ========================== -->
+          <section class="cfg-panel" data-panel="avatar" hidden>
+            <label class="chk" for="mouthMask">
+              <input id="mouthMask" type="checkbox" checked />
+              <span>Máscara da boca</span>
             </label>
-            <label>
-              Volume
-              <span id="volumeVal">100%</span>
-              <input id="volume" type="range" min="20" max="100" step="1" value="100" />
-            </label>
-            <label>
-              Mínimo da boca (Windows)
-              <span id="mouthMinVal">0%</span>
-              <input id="mouthMin" type="range" min="0" max="90" step="1" value="0" />
-            </label>
-            <label>
-              Máximo da boca (Windows)
-              <span id="mouthMaxVal">100%</span>
-              <input id="mouthMax" type="range" min="10" max="100" step="1" value="100" />
-            </label>
-          </div>
-          <p class="hint" id="mouthGainHint">Mínimo = piso. Máximo = teto. Cada voz do Windows tem o seu par.</p>
+            <p class="hint">Desmarque para usar o visema inteiro, sem recorte.</p>
 
-          <div class="engine">
-            <label class="seg">
-              <input type="radio" name="engine" id="engineSapi" checked />
-              <span>Windows SAPI</span>
-            </label>
-            <label class="seg">
-              <input type="radio" name="engine" id="engineBrowser" />
-              <span>Navegador</span>
-            </label>
-          </div>
-          <p class="hint" id="engineHint"></p>
+            <p class="lbl">Testar boca</p>
+            <div class="visemes">
+              <button type="button" data-viseme="rest">REST</button>
+              <button type="button" data-viseme="mbp">M</button>
+              <button type="button" data-viseme="s">S</button>
+              <button type="button" data-viseme="e">E</button>
+              <button type="button" data-viseme="aa">A</button>
+              <button type="button" data-viseme="aa_max">AH</button>
+              <button type="button" data-viseme="o">O</button>
+              <button type="button" data-viseme="u">U</button>
+            </div>
 
-          <canvas id="meter" height="48"></canvas>
+            <p class="lbl">Nível da fala</p>
+            <canvas id="meter" height="48"></canvas>
+            <p class="hint" id="avatarHint">Os avatares ficam em assets/avatars. Uma pasta nova aparece no seletor acima do palco.</p>
+          </section>
 
-          <label class="chk" for="mouthMask">
-            <input id="mouthMask" type="checkbox" checked />
-            <span>Máscara da boca</span>
-          </label>
-          <p class="hint">Desmarque para usar o visema inteiro, sem recorte.</p>
+          <!-- ========================== PERSONA ========================== -->
+          <section class="cfg-panel" data-panel="persona" hidden>
+            <label class="lbl" for="systemPrompt">System prompt</label>
+            <textarea id="systemPrompt" rows="6" placeholder="Instruções do avatar…"></textarea>
+            <div class="row">
+              <button id="btnSaveSystem" class="primary" type="button">Salvar</button>
+              <button id="btnResetSystem" class="ghost" type="button">Padrão</button>
+            </div>
+            <p class="hint" id="systemHint">O texto da caixa já vale na próxima pergunta. Salvar grava no site.</p>
 
-          <p class="lbl">Testar boca</p>
-          <div class="visemes">
-            <button type="button" data-viseme="rest">REST</button>
-            <button type="button" data-viseme="mbp">M</button>
-            <button type="button" data-viseme="s">S</button>
-            <button type="button" data-viseme="e">E</button>
-            <button type="button" data-viseme="aa">A</button>
-            <button type="button" data-viseme="aa_max">AH</button>
-            <button type="button" data-viseme="o">O</button>
-            <button type="button" data-viseme="u">U</button>
-          </div>
+            <p class="lbl">Frases</p>
+            <div id="presets" class="chips"></div>
+          </section>
 
-          <p class="lbl">Frases</p>
-          <div id="presets" class="chips"></div>
         </div>
       </div>
     </div>

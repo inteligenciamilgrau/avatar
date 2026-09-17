@@ -1,0 +1,11 @@
+{
+  "name": "Base",
+  "description": "Avatar padrao do projeto: fotos de visemas em 2D e o modelo voxel do Blender em 3D.",
+  "order": 0,
+  "eyes": [
+    { "x": 0.385, "y": 0.445, "rx": 0.09, "ry": 0.07 },
+    { "x": 0.615, "y": 0.445, "rx": 0.09, "ry": 0.07 }
+  ],
+  "glow": { "inner": "210,255,80", "outer": "80,220,40", "radius": 0.055 },
+  "jaw": { "top": 0.54, "bottom": 0.63, "left": 0.18, "width": 0.64, "height": 0.32 }
+}

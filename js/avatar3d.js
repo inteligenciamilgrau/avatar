@@ -2,7 +2,9 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-const MAP = {
+// Nome do visema -> morph targets do glb. Um avatar.json pode trocar este mapa
+// pelo campo "morphs", caso o modelo use outra nomenclatura de shape keys.
+const DEFAULT_MAP = {
   rest: {},
   mbp: { mbp: 1 },
   s: { s: 1 },
@@ -12,6 +14,7 @@ const MAP = {
   o: { o: 1 },
   u: { u: 1 },
 };
+const BLINK_MORPH = "blk";
 
 export class Avatar3D {
   constructor(canvas) {
@@ -21,6 +24,8 @@ export class Avatar3D {
     this.camera = null;
     this.controls = null;
     this.root = null;
+    this.map = DEFAULT_MAP;
+    this.morphNames = null;
     this.morphMeshes = [];
     this.rings = [];
     this.weights = {};
@@ -39,7 +44,9 @@ export class Avatar3D {
     this.speaking = false;
   }
 
-  async load() {
+  // Cena, luzes e camera sao montadas uma vez so; trocar de avatar so troca o modelo.
+  initScene() {
+    if (this.renderer) return;
     const renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       antialias: true,
@@ -78,8 +85,48 @@ export class Avatar3D {
     const fill = new THREE.PointLight(0x44ff88, 2.2, 12);
     fill.position.set(0, 0.4, 2.2);
     scene.add(fill);
+  }
 
-    const gltf = await new GLTFLoader().loadAsync("assets/voxel_avatar.glb");
+  // Descarta o modelo anterior; sem isso, trocar de avatar vaza GPU a cada troca.
+  disposeModel() {
+    if (!this.root) return;
+    this.root.traverse((obj) => {
+      if (!obj.isMesh) return;
+      if (obj.geometry) obj.geometry.dispose();
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      for (const mat of mats) {
+        if (!mat) continue;
+        for (const k of Object.keys(mat)) {
+          const v = mat[k];
+          if (v && v.isTexture) v.dispose();
+        }
+        mat.dispose();
+      }
+    });
+    this.scene.remove(this.root);
+    this.root = null;
+    this.head = null;
+    this.morphMeshes = [];
+    this.rings = [];
+    this.weights = {};
+  }
+
+  async load(avatar) {
+    const url = (avatar && avatar.model) || null;
+    if (!url) throw new Error("avatar sem modelo .glb");
+    this.map = (avatar && avatar.morphs) || DEFAULT_MAP;
+    // Todos os morphs citados no mapa, mais o do piscar.
+    const names = new Set([BLINK_MORPH]);
+    for (const m of Object.values(this.map)) {
+      for (const n of Object.keys(m || {})) names.add(n);
+    }
+    this.morphNames = names;
+
+    this.initScene();
+    const gltf = await new GLTFLoader().loadAsync(url);
+    this.ready = false;
+    this.disposeModel();
+    const scene = this.scene;
     const root = gltf.scene;
     root.traverse((obj) => {
       if (!obj.isMesh) return;
@@ -139,7 +186,7 @@ export class Avatar3D {
   }
 
   setViseme(name) {
-    this.target = MAP[name] ? name : "rest";
+    this.target = this.map[name] ? name : "rest";
   }
 
   setSpeaking(v) {
@@ -172,10 +219,10 @@ export class Avatar3D {
   }
 
   tick(t) {
-    const want = MAP[this.target] || {};
-    const names = new Set(["aa", "ah", "o", "u", "e", "mbp", "s", "blk"]);
+    const want = this.map[this.target] || {};
+    const names = this.morphNames || new Set();
     for (const n of names) {
-      const goal = n === "blk" ? this.blink : want[n] || 0;
+      const goal = n === BLINK_MORPH ? this.blink : want[n] || 0;
       const cur = this.weights[n] || 0;
       this.weights[n] = cur + (goal - cur) * 0.28;
     }

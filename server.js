@@ -203,6 +203,100 @@ function readBody(req, limit) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Avatares. Cada pasta em assets/avatars/ vira um avatar. O formato e deduzido
+// do conteudo: visemes/ com as fotos habilita o 2D, um .glb habilita o 3D, e
+// ter os dois habilita as duas abas. O avatar.json e opcional e so ajusta.
+// ---------------------------------------------------------------------------
+const AVATARS_DIR = path.join(ROOT, "assets", "avatars");
+const DEFAULT_AVATAR = "base";
+// rest e o unico obrigatorio: e o rosto parado. Os outros entram se existirem.
+const VISEME_NAMES = ["rest", "mbp", "s", "e", "aa", "aa_max", "o", "u"];
+const IMG_EXT = [".jpg", ".jpeg", ".png", ".webp"];
+
+function findViseme(dir, name) {
+  for (const ext of IMG_EXT) {
+    if (fs.existsSync(path.join(dir, name + ext))) return name + ext;
+  }
+  return null;
+}
+
+function readAvatarManifest(dir) {
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(dir, "avatar.json"), "utf8"));
+    return j && typeof j === "object" ? j : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function scanAvatar(id) {
+  const dir = path.join(AVATARS_DIR, id);
+  if (!fs.statSync(dir).isDirectory()) return null;
+  const manifest = readAvatarManifest(dir);
+  const base = "assets/avatars/" + encodeURIComponent(id) + "/";
+
+  const visemeDir = path.join(dir, "visemes");
+  const visemes = {};
+  if (fs.existsSync(visemeDir)) {
+    for (const name of VISEME_NAMES) {
+      const file = findViseme(visemeDir, name);
+      if (file) visemes[name] = base + "visemes/" + file;
+    }
+  }
+  const blinkFile = fs.existsSync(visemeDir) ? findViseme(visemeDir, "blink") : null;
+
+  // model.glb tem preferencia; fora isso vale qualquer .glb solto na pasta.
+  let model = null;
+  const glbs = fs.readdirSync(dir).filter((f) => f.toLowerCase().endsWith(".glb"));
+  if (glbs.length) {
+    const preferred = glbs.find((f) => f.toLowerCase() === "model.glb") || glbs.sort()[0];
+    model = base + encodeURIComponent(preferred);
+  }
+
+  const has2d = !!visemes.rest;
+  const has3d = !!model;
+  if (!has2d && !has3d) return null;
+
+  return {
+    id,
+    name: String(manifest.name || id),
+    description: String(manifest.description || ""),
+    order: Number.isFinite(manifest.order) ? Number(manifest.order) : 500,
+    has2d,
+    has3d,
+    visemes,
+    blink: blinkFile ? base + "visemes/" + blinkFile : null,
+    model,
+    eyes: Array.isArray(manifest.eyes) ? manifest.eyes : null,
+    glow: manifest.glow && typeof manifest.glow === "object" ? manifest.glow : null,
+    jaw: manifest.jaw && typeof manifest.jaw === "object" ? manifest.jaw : null,
+    morphs: manifest.morphs && typeof manifest.morphs === "object" ? manifest.morphs : null,
+  };
+}
+
+function scanAvatars() {
+  if (!fs.existsSync(AVATARS_DIR)) return [];
+  const out = [];
+  for (const entry of fs.readdirSync(AVATARS_DIR)) {
+    if (entry.startsWith(".")) continue;
+    try {
+      const a = scanAvatar(entry);
+      if (a) out.push(a);
+    } catch (e) {
+      // Uma pasta quebrada nao pode derrubar a lista inteira.
+      console.warn("avatar ignorado:", entry, e.message);
+    }
+  }
+  // O padrao primeiro, depois o campo order, depois alfabetico.
+  out.sort((a, b) => {
+    if (a.id === DEFAULT_AVATAR) return -1;
+    if (b.id === DEFAULT_AVATAR) return 1;
+    return a.order - b.order || a.name.localeCompare(b.name);
+  });
+  return out;
+}
+
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 
 function hostOf(value) {
@@ -649,6 +743,10 @@ const server = http.createServer(async (req, res) => {
         "Cache-Control": "no-store",
       });
       res.end(JSON.stringify(data));
+      return;
+    }
+    if (req.method === "GET" && url.startsWith("/api/avatars")) {
+      sendJson(res, 200, { ok: true, default: DEFAULT_AVATAR, avatars: scanAvatars() });
       return;
     }
     if (req.method === "GET" && url.startsWith("/api/voices")) {

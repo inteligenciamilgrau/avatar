@@ -1,13 +1,11 @@
-const VISEME_FILES = {
-  rest: "assets/visemes/rest.jpg",
-  mbp: "assets/visemes/mbp.jpg",
-  s: "assets/visemes/s.jpg",
-  e: "assets/visemes/e.jpg",
-  aa: "assets/visemes/aa.jpg",
-  aa_max: "assets/visemes/aa_max.jpg",
-  o: "assets/visemes/o.jpg",
-  u: "assets/visemes/u.jpg",
-};
+// Valores do avatar base. Um avatar.json pode sobrescrever qualquer um deles:
+// olhos em outra posicao, brilho de outra cor, queixo em outra altura.
+const DEFAULT_EYES = [
+  { x: 0.385, y: 0.445, rx: 0.09, ry: 0.07 },
+  { x: 0.615, y: 0.445, rx: 0.09, ry: 0.07 },
+];
+const DEFAULT_GLOW = { inner: "210,255,80", outer: "80,220,40", radius: 0.055 };
+const DEFAULT_JAW = { top: 0.54, bottom: 0.63, left: 0.18, width: 0.64, height: 0.32 };
 
 function loadImage(src) {
   return new Promise((resolve, reject) => {
@@ -18,16 +16,17 @@ function loadImage(src) {
   });
 }
 
-function makeJawMask(w, h) {
+function makeJawMask(w, h, jaw) {
+  const j = Object.assign({}, DEFAULT_JAW, jaw || {});
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
   const ctx = c.getContext("2d");
-  const g = ctx.createLinearGradient(0, h * 0.54, 0, h * 0.63);
+  const g = ctx.createLinearGradient(0, h * j.top, 0, h * j.bottom);
   g.addColorStop(0, "rgba(255,255,255,0)");
   g.addColorStop(1, "rgba(255,255,255,1)");
   ctx.fillStyle = g;
-  ctx.fillRect(w * 0.18, h * 0.54, w * 0.64, h * 0.32);
+  ctx.fillRect(w * j.left, h * j.top, w * j.width, h * j.height);
   const fade = ctx.createRadialGradient(w * 0.5, h * 0.68, h * 0.08, w * 0.5, h * 0.68, h * 0.28);
   fade.addColorStop(0, "rgba(255,255,255,1)");
   fade.addColorStop(1, "rgba(255,255,255,0)");
@@ -63,6 +62,11 @@ export class VoxelAvatar {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d", { alpha: true });
+    this.files = {};
+    this.blinkSrc = null;
+    this.eyes = DEFAULT_EYES;
+    this.glow = DEFAULT_GLOW;
+    this.jaw = DEFAULT_JAW;
     this.images = {};
     this.blinkImg = null;
     this.scratch = document.createElement("canvas");
@@ -91,12 +95,28 @@ export class VoxelAvatar {
     this.nextLook = 800;
   }
 
-  async load() {
-    const jobs = Object.entries(VISEME_FILES).map(async ([k, src]) => {
-      this.images[k] = await loadImage(src);
-    });
-    this.blinkImg = await loadImage("assets/visemes/blink.jpg");
-    await Promise.all(jobs);
+  // Recebe o avatar vindo de /api/avatars. Pode ser chamado de novo para trocar
+  // de avatar sem recarregar a pagina.
+  async load(avatar) {
+    if (avatar) {
+      this.files = avatar.visemes || {};
+      this.blinkSrc = avatar.blink || null;
+      this.eyes = avatar.eyes && avatar.eyes.length ? avatar.eyes : DEFAULT_EYES;
+      this.glow = Object.assign({}, DEFAULT_GLOW, avatar.glow || {});
+      this.jaw = Object.assign({}, DEFAULT_JAW, avatar.jaw || {});
+    }
+    if (!this.files.rest) throw new Error("avatar 2D sem visemes/rest");
+    const images = {};
+    await Promise.all(
+      Object.entries(this.files).map(async ([k, src]) => {
+        images[k] = await loadImage(src);
+      })
+    );
+    // So troca depois que tudo carregou, para nao piscar meio avatar na tela.
+    this.images = images;
+    this.weights = { rest: 1 };
+    this.target = "rest";
+    this.blinkImg = this.blinkSrc ? await loadImage(this.blinkSrc).catch(() => null) : null;
     this.resize();
   }
 
@@ -113,11 +133,17 @@ export class VoxelAvatar {
     this.bufH = size;
     this.scratch.width = size;
     this.scratch.height = size;
-    this.mouthMask = makeJawMask(size, size);
-    this.eyeMask = makeEyesMask(size, size, [
-      { x: size * 0.385, y: size * 0.445, rx: size * 0.09, ry: size * 0.07 },
-      { x: size * 0.615, y: size * 0.445, rx: size * 0.09, ry: size * 0.07 },
-    ]);
+    this.mouthMask = makeJawMask(size, size, this.jaw);
+    this.eyeMask = makeEyesMask(
+      size,
+      size,
+      this.eyes.map((e) => ({
+        x: size * e.x,
+        y: size * e.y,
+        rx: size * e.rx,
+        ry: size * e.ry,
+      }))
+    );
   }
 
   setViseme(name) {
@@ -245,17 +271,21 @@ export class VoxelAvatar {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     const pulse = 0.18 + Math.sin(t * 3.2) * 0.06 + this.energy * 0.28;
-    this.glowEye(w * 0.385, h * 0.445, w * 0.055, pulse);
-    this.glowEye(w * 0.615, h * 0.445, w * 0.055, pulse);
+    const r = w * (this.glow.radius || DEFAULT_GLOW.radius);
+    for (const eye of this.eyes) {
+      this.glowEye(w * eye.x, h * eye.y, r, pulse);
+    }
     ctx.restore();
 
     ctx.restore();
   }
 
   glowEye(x, y, r, a) {
+    const inner = this.glow.inner || DEFAULT_GLOW.inner;
+    const outer = this.glow.outer || DEFAULT_GLOW.outer;
     const g = this.ctx.createRadialGradient(x, y, r * 0.1, x, y, r);
-    g.addColorStop(0, `rgba(210,255,80,${0.55 * a})`);
-    g.addColorStop(0.45, `rgba(80,220,40,${0.22 * a})`);
+    g.addColorStop(0, `rgba(${inner},${0.55 * a})`);
+    g.addColorStop(0.45, `rgba(${outer},${0.22 * a})`);
     g.addColorStop(1, "rgba(0,0,0,0)");
     this.ctx.fillStyle = g;
     this.ctx.beginPath();

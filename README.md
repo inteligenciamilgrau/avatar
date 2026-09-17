@@ -104,6 +104,88 @@ O microfone pausa enquanto o avatar fala, para não escutar a própria voz.
 
 ---
 
+## Criar o seu próprio avatar
+
+Cada pasta dentro de `assets/avatars/` é um avatar. Crie uma pasta, jogue os arquivos
+dentro e **reinicie o servidor** — ele aparece no seletor, acima do palco. Não precisa
+mexer em código.
+
+O formato é deduzido do conteúdo da pasta:
+
+| O que você põe na pasta | O que ganha |
+|---|---|
+| `visemes/` com as fotos | aba **2D · Imagem** |
+| um arquivo `.glb` | aba **3D · Blender** |
+| os dois | as duas abas |
+
+As abas que o avatar não suporta ficam desabilitadas, e trocar para um avatar só-3D
+muda de aba sozinho.
+
+### Avatar 2D (fotos)
+
+```
+assets/avatars/meu-avatar/
+  visemes/
+    rest.jpg     ← único obrigatório: o rosto parado
+    mbp.jpg      ← boca fechada (m, b, p)
+    s.jpg        ← dentes (s, z, t)
+    e.jpg        ← boca em "ê"
+    aa.jpg       ← boca aberta
+    aa_max.jpg   ← boca bem aberta
+    o.jpg        ← boca em "ô"
+    u.jpg        ← bico (u, w)
+    blink.jpg    ← olhos fechados (opcional)
+```
+
+Valem `.jpg`, `.jpeg`, `.png` e `.webp`. **Só o `rest` é obrigatório** — os que faltarem
+são substituídos pelo `rest` na hora de falar, então dá para começar com dois ou três e
+ir completando. Use o mesmo enquadramento e resolução em todas, senão a troca "pula".
+
+O ideal é que todas as fotos sejam do mesmo rosto, na mesma posição, mudando só a boca.
+As do avatar base foram geradas por IA a partir de uma imagem só.
+
+### Avatar 3D (Blender)
+
+Exporte o `.glb` com shape keys chamadas `aa`, `ah`, `o`, `u`, `e`, `mbp`, `s` e `blk`,
+e salve como `model.glb` na pasta. Qualquer `.glb` serve — se houver mais de um, ele
+prefere o `model.glb`.
+
+Se o seu modelo usa outros nomes de shape key, não precisa reexportar: reescreva o mapa
+no `avatar.json` (campo `morphs`, abaixo).
+
+### `avatar.json` — opcional
+
+Sem ele o avatar funciona, usando o nome da pasta e os valores do avatar base. Serve
+para ajustar:
+
+```json
+{
+  "name": "Meu Avatar",
+  "description": "Aparece embaixo do seletor",
+  "order": 10,
+
+  "eyes": [
+    { "x": 0.385, "y": 0.445, "rx": 0.09, "ry": 0.07 },
+    { "x": 0.615, "y": 0.445, "rx": 0.09, "ry": 0.07 }
+  ],
+  "glow": { "inner": "210,255,80", "outer": "80,220,40", "radius": 0.055 },
+  "jaw": { "top": 0.54, "bottom": 0.63, "left": 0.18, "width": 0.64, "height": 0.32 },
+
+  "morphs": { "rest": {}, "aa": { "jawOpen": 1 }, "o": { "mouthO": 1 } }
+}
+```
+
+- **`eyes`** — onde ficam os olhos, em fração da imagem (`0.5` = meio). É daqui que sai
+  o brilho e a máscara do piscar. **Se o seu rosto tem os olhos em outra altura, ajuste
+  isto** — é o campo que mais importa num avatar novo.
+- **`glow`** — cor do brilho dos olhos, em `R,G,B`.
+- **`jaw`** — a faixa da imagem onde a boca é misturada, também em fração.
+- **`morphs`** — só para 3D: de visema para shape key do seu modelo.
+
+Uma pasta quebrada não derruba as outras: ela é ignorada e o servidor avisa no terminal.
+
+---
+
 ## Segurança
 
 - O servidor escuta **só em `127.0.0.1`** e recusa requisições cujo `Host` ou `Origin`
@@ -120,7 +202,7 @@ O microfone pausa enquanto o avatar fala, para não escutar a própria voz.
 Nada disso é preciso para rodar — tudo está no `.gitignore`:
 
 - `blender/` — o workspace que gerou o avatar. O modelo pronto já vai em
-  `assets/voxel_avatar.glb`. Os renders do Blender carregam o caminho absoluto da
+  `assets/avatars/base/model.glb`. Os renders do Blender carregam o caminho absoluto da
   máquina de origem nos metadados do PNG.
 - `tools/TtsTool.exe` — o `start.bat` compila com o csc que já vem no Windows.
 - `tmp/`, `node_modules/`, `.venv/`, `.env`, `data/ollama.json`.
@@ -130,12 +212,14 @@ Nada disso é preciso para rodar — tudo está no `.gitignore`:
 ## Estrutura
 
 ```
-server.js              servidor local: estáticos + API + proxy do Gemini
-index.html  css/  js/  interface e avatar (Three.js, sem build)
-js/stt.js              captura do microfone, VAD e envio para o Whisper
+server.js               servidor local: estáticos + API + proxy do Gemini
+index.html  css/  js/   interface e avatar (Three.js, sem build)
+js/avatar.js            avatar 2D: mistura as fotos dos visemas no canvas
+js/avatar3d.js          avatar 3D: carrega o .glb e move as shape keys
+js/stt.js               captura do microfone, VAD e envio para o Whisper
 tools/whisper_worker.py worker do Faster Whisper (JSONL no stdin/stdout)
-tools/TtsTool.cs       voz do Windows (SAPI) + visemas para o lipsync
-assets/                avatar 3D e as imagens dos visemas
+tools/TtsTool.cs        voz do Windows (SAPI) + visemas para o lipsync
+assets/avatars/         um avatar por pasta; base/ é o que vem junto
 ```
 
 ## Créditos

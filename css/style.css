@@ -102,6 +102,19 @@ body.resizing canvas {
   border-color: var(--accent);
   font-weight: 700;
 }
+.view-tab:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.avatar-pick {
+  margin-left: auto;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  padding: 8px 10px;
+  max-width: 200px;
+}
 
 .stage-frame {
   position: relative;
@@ -269,6 +282,39 @@ body.resizing canvas {
   margin: 0;
   font-size: 18px;
   letter-spacing: 0.04em;
+}
+
+/* Abas do painel de configuracoes. As que nao valem para o motor
+   selecionado ficam com hidden e somem da fila. */
+.cfg-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.cfg-tab {
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 7px 11px;
+}
+.cfg-tab.is-on {
+  color: #081204;
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+.cfg-tab[hidden] { display: none !important; }
+.cfg-panel[hidden] { display: none !important; }
+.cfg-group[hidden] { display: none !important; }
+/* O primeiro rotulo de cada aba nao precisa da margem de cima. */
+.cfg-panel > :first-child,
+.cfg-group > :first-child {
+  margin-top: 0;
 }
 
 .kicker {

@@ -29,6 +29,9 @@ const state = {
   durationMs: 0,
   mode: "sapi",
   view: "2d",
+  cfgPanel: "voz",
+  avatarId: "base",
+  avatars: [],
   llmEngine: "ollama",
   mouthGain: {},
   panelWidth: 400,
@@ -67,6 +70,7 @@ function persist() {
     engine: $("engineSapi").checked ? "sapi" : "browser",
     mouthMask: $("mouthMask").checked,
     view: state.view,
+    avatarId: state.avatarId,
     llmEngine: $("llmEngine").value,
     liveVoice: $("liveVoice") ? $("liveVoice").value : "",
     geminiVoice: $("geminiVoice") ? $("geminiVoice").value : "Kore",
@@ -957,10 +961,16 @@ function previewViseme(name) {
   setStatus("PREVIEW · " + name.toUpperCase(), "busy");
 }
 
+function currentAvatar() {
+  return state.avatars.find((a) => a.id === state.avatarId) || state.avatars[0] || null;
+}
+
 function ensure3d() {
+  const av = currentAvatar();
+  if (!av || !av.has3d) return Promise.reject(new Error("este avatar nao tem modelo 3D"));
   if (loading3d) return loading3d;
   loading3d = avatar3d
-    .load()
+    .load(av)
     .then(() => {
       avatar3d.start();
       if (state.view === "3d") avatar3d.setActive(true);
@@ -971,6 +981,69 @@ function ensure3d() {
       throw e;
     });
   return loading3d;
+}
+
+// Preenche o seletor e desabilita as abas que o avatar escolhido nao suporta.
+function renderAvatarPicker() {
+  const sel = $("avatarPick");
+  if (sel) {
+    sel.innerHTML = "";
+    for (const a of state.avatars) {
+      const opt = document.createElement("option");
+      opt.value = a.id;
+      opt.textContent = a.name + (a.has2d && a.has3d ? "" : a.has3d ? " · 3D" : " · 2D");
+      sel.appendChild(opt);
+    }
+    sel.value = state.avatarId;
+    sel.hidden = state.avatars.length < 2;
+  }
+  const av = currentAvatar();
+  const tab2d = $("tab2d");
+  const tab3d = $("tab3d");
+  if (tab2d) {
+    tab2d.disabled = !av || !av.has2d;
+    tab2d.title = tab2d.disabled ? "Este avatar nao tem fotos de visemas" : "";
+  }
+  if (tab3d) {
+    tab3d.disabled = !av || !av.has3d;
+    tab3d.title = tab3d.disabled ? "Este avatar nao tem modelo .glb" : "";
+  }
+  if (av && av.description) {
+    const hint = $("avatarHint");
+    if (hint) hint.textContent = av.description;
+  }
+}
+
+// Troca o avatar em uso. Recarrega o 2D e joga fora o 3D anterior para que o
+// proximo ensure3d() carregue o modelo novo.
+async function applyAvatar(id, { persistPref = true } = {}) {
+  const found = state.avatars.find((a) => a.id === id);
+  if (!found) throw new Error("avatar nao encontrado: " + id);
+  state.avatarId = found.id;
+  loading3d = null;
+  if (found.has2d) {
+    await avatar.load(found);
+    avatar.setMouthMask($("mouthMask").checked);
+  }
+  renderAvatarPicker();
+  // Se a aba atual nao serve para este avatar, vai para a que serve.
+  const wanted = state.view === "3d" && found.has3d ? "3d" : found.has2d ? "2d" : "3d";
+  setView(wanted);
+  if (persistPref) persist();
+}
+
+async function loadAvatarList(preferredId) {
+  const r = await fetch("/api/avatars");
+  const j = await r.json();
+  if (!r.ok || !j.ok || !Array.isArray(j.avatars) || !j.avatars.length) {
+    throw new Error((j && j.error) || "nenhum avatar encontrado em assets/avatars");
+  }
+  state.avatars = j.avatars;
+  const pick =
+    state.avatars.find((a) => a.id === preferredId) ||
+    state.avatars.find((a) => a.id === j.default) ||
+    state.avatars[0];
+  return pick.id;
 }
 
 function setView(view) {
@@ -1005,8 +1078,14 @@ function setView(view) {
 async function boot() {
   bg.start();
   setStatus("CARREGANDO…", "busy");
-  await avatar.load();
-  avatar.setMouthMask($("mouthMask").checked);
+  const pickedId = await loadAvatarList(prefs.avatarId);
+  state.avatarId = pickedId;
+  const picked = currentAvatar();
+  if (picked.has2d) {
+    await avatar.load(picked);
+    avatar.setMouthMask($("mouthMask").checked);
+  }
+  renderAvatarPicker();
   avatar.start();
   avatar.onFrame = () => {
     applyLipsync();
@@ -1016,7 +1095,7 @@ async function boot() {
     avatar.resize();
     avatar3d.resize();
   });
-  ensure3d().catch(() => {});
+  if (picked.has3d) ensure3d().catch(() => {});
 
   const sapi = await tts.probe();
   const wantSapi = prefs.engine === "browser" ? false : sapi;
@@ -1097,7 +1176,7 @@ async function boot() {
   $("loading").classList.add("hidden");
   $("loading").setAttribute("aria-hidden", "true");
   setStatus("PRONTA", "idle");
-  if (prefs.view === "3d") setView("3d");
+  if (prefs.view === "3d" && picked.has3d) setView("3d");
 }
 
 $("btnSpeak").addEventListener("click", speak);
@@ -1188,6 +1267,7 @@ $("mouthMask").addEventListener("change", () => {
 $("llmEngine").addEventListener("change", async () => {
   updateSendUi();
   updateMouthGainUi();
+  syncCfgForEngine();
   persist();
   await disconnectVoiceSession();
   await disconnectStt();
@@ -1457,11 +1537,68 @@ document.querySelectorAll("[data-viseme]").forEach((btn) => {
 });
 
 document.querySelectorAll(".view-tab").forEach((btn) => {
-  btn.addEventListener("click", () => setView(btn.dataset.view));
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    setView(btn.dataset.view);
+  });
 });
 window.setAvatarView = setView;
 
+if ($("avatarPick")) {
+  $("avatarPick").addEventListener("change", async (e) => {
+    const id = e.target.value;
+    setStatus("TROCANDO AVATAR…", "busy");
+    try {
+      stopTalk();
+      await applyAvatar(id);
+      setStatus("PRONTA", "idle");
+    } catch (err) {
+      console.error(err);
+      setStatus(err.message || "falha ao trocar de avatar", "err");
+      e.target.value = state.avatarId;
+    }
+  });
+}
+
+// Abas do painel de configuracoes -------------------------------------------
+
+function showCfgPanel(name) {
+  const tabs = [...document.querySelectorAll(".cfg-tab")];
+  const visible = tabs.filter((t) => !t.hidden);
+  if (!visible.length) return;
+  // Se a aba pedida sumiu por causa do motor, cai na primeira visivel.
+  const target = visible.some((t) => t.dataset.panel === name) ? name : visible[0].dataset.panel;
+  for (const tab of tabs) {
+    const on = tab.dataset.panel === target;
+    tab.classList.toggle("is-on", on);
+    tab.setAttribute("aria-selected", on ? "true" : "false");
+  }
+  for (const panel of document.querySelectorAll(".cfg-panel")) {
+    panel.hidden = panel.dataset.panel !== target;
+  }
+  state.cfgPanel = target;
+}
+
+// Esconde o que nao pertence ao motor escolhido: nada de voz do Windows
+// aparecer junto com as vozes da OpenAI e da Google.
+function syncCfgForEngine() {
+  const engine = $("llmEngine").value;
+  const local = !isVoiceLive();
+
+  for (const group of document.querySelectorAll(".cfg-group[data-voice]")) {
+    const want = group.dataset.voice;
+    group.hidden = want === "local" ? !local : want !== engine;
+  }
+  // Whisper e Ollama so existem no motor local.
+  for (const tab of document.querySelectorAll(".cfg-tab")) {
+    const p = tab.dataset.panel;
+    tab.hidden = (p === "microfone" || p === "ollama") && !local;
+  }
+  showCfgPanel(state.cfgPanel || "voz");
+}
+
 function openConfig() {
+  syncCfgForEngine();
   $("configModal").hidden = false;
   avatar.resize();
 }
@@ -1470,6 +1607,10 @@ function closeConfig() {
 }
 $("btnConfig").addEventListener("click", openConfig);
 $("btnCloseConfig").addEventListener("click", closeConfig);
+
+document.querySelectorAll(".cfg-tab").forEach((tab) => {
+  tab.addEventListener("click", () => showCfgPanel(tab.dataset.panel));
+});
 $("configModal").addEventListener("click", (e) => {
   if (e.target === $("configModal")) closeConfig();
 });
